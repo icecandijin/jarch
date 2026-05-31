@@ -454,10 +454,6 @@
     <h1><span>Jin</span><span class="rest">'s Archive</span><span class="dot">.</span></h1>
     <p class="sub">로그인하면 어떤 기기·브라우저에서든 같은 데이터를 볼 수 있어요</p>
     <button id="btn-google" class="google-btn"><span class="gico"></span>Google로 계속하기</button>
-    <div class="divider">또는 이메일로</div>
-    <label for="login-email">이메일</label>
-    <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" />
-    <button id="btn-magiclink" class="primary">로그인 링크 받기</button>
     <p class="msg" id="login-msg"></p>
   </div>
 </div>
@@ -589,8 +585,6 @@ const CAT_PALETTE = [
   { bg: '#E4DBF0', fg: '#6B4FAE' },
   { bg: '#FFF4C9', fg: '#B58E20' },
 ];
-const LAST_EMAIL_KEY = 'jarch-last-email';
-
 let state = { categories: [], terms: [] };
 let session = null;
 let filter = { category: 'ALL', query: '' };
@@ -652,42 +646,7 @@ async function applySession(s) {
     splash.classList.add('hidden');
     loginView.classList.add('open');
     unsubscribeRealtime();
-    // Prefill last used email
-    const last = localStorage.getItem(LAST_EMAIL_KEY);
-    if (last) document.getElementById('login-email').value = last;
   }
-}
-
-async function sendMagicLink() {
-  const emailEl = document.getElementById('login-email');
-  const msgEl = document.getElementById('login-msg');
-  const btn = document.getElementById('btn-magiclink');
-  const email = emailEl.value.trim();
-  msgEl.className = 'msg';
-  msgEl.textContent = '';
-
-  if (!email || !email.includes('@')) {
-    msgEl.classList.add('error');
-    msgEl.textContent = '올바른 이메일을 입력해주세요';
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = '전송 중…';
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
-  });
-  btn.disabled = false;
-  btn.textContent = '로그인 링크 받기';
-
-  if (error) {
-    msgEl.classList.add('error');
-    msgEl.textContent = '전송 실패: ' + error.message;
-    return;
-  }
-  localStorage.setItem(LAST_EMAIL_KEY, email);
-  msgEl.classList.add('success');
-  msgEl.textContent = `${email} 로 로그인 링크를 보냈어요.\n메일함을 확인하고 링크를 클릭하면 자동 로그인됩니다.`;
 }
 
 async function signInGoogle() {
@@ -1251,10 +1210,6 @@ document.getElementById('file-import').onchange = (e) => {
 
 document.getElementById('btn-signout').onclick = signOut;
 document.getElementById('btn-google').onclick = signInGoogle;
-document.getElementById('btn-magiclink').onclick = sendMagicLink;
-document.getElementById('login-email').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendMagicLink();
-});
 
 // search: live filter + clickable magnifier focuses input
 document.getElementById('search-input').addEventListener('input', (e) => {
