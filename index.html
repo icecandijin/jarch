@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Cormorant+Garamond:wght@600;700&family=Gowun+Batang:wght@700&family=Gowun+Dodum&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Caveat:wght@500;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg:        #F7F4EE;
@@ -86,7 +87,20 @@
     letter-spacing: 0;
   }
 
-  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* ---------- Account widget ---------- */
+  .account-widget {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-right: 4px;
+  }
+  .account-widget .email {
+    font-size: 12px; color: var(--ink-soft);
+    padding: 4px 10px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
 
   /* ---------- Buttons ---------- */
   button, .btn {
@@ -275,12 +289,87 @@
   }
   .toast.show { opacity: 1; }
 
+  /* ---------- Loading splash ---------- */
+  .splash {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 600;
+    font-family: 'Playfair Display', serif;
+    font-size: 28px; color: var(--jin-navy);
+  }
+  .splash.hidden { display: none; }
+  .splash .dot { color: var(--title-gold); }
+
+  /* ---------- Login screen ---------- */
+  .login-screen {
+    position: fixed; inset: 0; background: var(--bg);
+    display: none; align-items: center; justify-content: center;
+    z-index: 500; padding: 20px;
+  }
+  .login-screen.open { display: flex; }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 40px 36px;
+    max-width: 420px; width: 100%;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .login-card h1 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 800;
+    font-size: 44px; line-height: 1.0;
+    margin: 0 0 4px;
+    color: var(--jin-navy);
+  }
+  .login-card h1 .rest { color: var(--title-blue); font-weight: 700; }
+  .login-card h1 .dot  { color: var(--title-gold); }
+  .login-card .sub {
+    color: var(--ink-soft); margin: 0 0 28px;
+    font-size: 14px;
+    font-family: 'Nanum Pen Script', cursive;
+    font-size: 22px;
+  }
+  .login-card label {
+    display: block; text-align: left; font-size: 13px;
+    color: var(--ink-soft); margin-bottom: 6px;
+  }
+  .login-card input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    font-family: inherit; font-size: 15px;
+    margin-bottom: 12px;
+    transition: border-color .15s ease;
+  }
+  .login-card input:focus {
+    outline: none; border-color: var(--accent); background: var(--surface);
+  }
+  .login-card button.primary {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    justify-content: center;
+  }
+  .login-card .msg {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    min-height: 20px;
+    white-space: pre-wrap;
+  }
+  .login-card .msg.success { color: var(--ok); }
+  .login-card .msg.error   { color: var(--danger); }
+
   /* ---------- Print ---------- */
   #print-view { display: none; }
   @media print {
     @page { margin: 18mm 16mm; }
     body { background: #fff; }
-    .wrap, .modal-backdrop, .toast, .lightbox { display: none !important; }
+    .wrap, .modal-backdrop, .toast, .lightbox, .login-screen, .splash { display: none !important; }
     #print-view { display: block !important; padding: 0; }
     #print-view h1 {
       font-family: 'Jua', 'Gaegu', sans-serif;
@@ -320,13 +409,33 @@
 </head>
 <body>
 
-<div class="wrap">
+<!-- ============ Splash (initial) ============ -->
+<div class="splash" id="splash">Jin's Archive<span class="dot">.</span></div>
+
+<!-- ============ Login ============ -->
+<div class="login-screen" id="login-view">
+  <div class="login-card">
+    <h1><span>Jin</span><span class="rest">'s Archive</span><span class="dot">.</span></h1>
+    <p class="sub">로그인하면 어떤 기기·브라우저에서든 같은 데이터를 볼 수 있어요</p>
+    <label for="login-email">이메일</label>
+    <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" />
+    <button id="btn-magiclink" class="primary">로그인 링크 받기</button>
+    <p class="msg" id="login-msg"></p>
+  </div>
+</div>
+
+<!-- ============ App ============ -->
+<div class="wrap hidden" id="app-view">
   <header class="app-header">
     <div class="brand">
       <h1 aria-label="Jin's Archive"><span class="jin">Jin</span><span class="rest">'s Archive</span><span class="dot">.</span></h1>
       <p>IT 용어를 차곡차곡 정리하는 진의 작은 서재</p>
     </div>
     <div class="header-actions">
+      <span class="account-widget">
+        <span class="email" id="account-email"></span>
+        <button id="btn-signout" class="ghost" title="로그아웃">로그아웃</button>
+      </span>
       <button id="btn-add" class="primary">＋ 새 용어</button>
       <button id="btn-excel" class="ghost" title="엑셀(.xlsx)로 내보내기">📊 엑셀</button>
       <button id="btn-export" class="ghost" title="JSON 전체 백업 (사진 포함)">⬇ 백업</button>
@@ -421,61 +530,36 @@
 
 <script>
 /* ============================================================
-   Jin's Archive
+   Jin's Archive — Supabase-backed
    ============================================================ */
 
-const STORAGE_KEY = 'jins-archive-v1';
-const DEFAULT_CATEGORIES = ['일반 용어', '프로그램 이름', '임베디드 관련', '인공지능 관련'];
+const SUPABASE_URL = 'https://wvkjfcocetzavjwolykf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_oUGFVnMXlirEZkBvod7cCQ_7ICDikje';
+const { createClient } = window.supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const FALLBACK_CATEGORY = '일반 용어';
 const CAT_PALETTE = [
-  { bg: '#FFE3E3', fg: '#D14B5A' },  // red
-  { bg: '#E1F3E4', fg: '#3A9D5D' },  // green
-  { bg: '#DBEAFD', fg: '#2E72D2' },  // blue
-  { bg: '#FFE7CC', fg: '#E47B27' },  // orange
-  { bg: '#ECDFF4', fg: '#8B4FB8' },  // purple
-  { bg: '#D6F1F4', fg: '#1F8B95' },  // cyan
-  { bg: '#FBDDEB', fg: '#D04D88' },  // pink
-  { bg: '#E9F4D2', fg: '#7AAD3C' },  // lime
-  { bg: '#E4DBF0', fg: '#6B4FAE' },  // deep purple
-  { bg: '#FFF4C9', fg: '#B58E20' },  // yellow
+  { bg: '#FFE3E3', fg: '#D14B5A' },
+  { bg: '#E1F3E4', fg: '#3A9D5D' },
+  { bg: '#DBEAFD', fg: '#2E72D2' },
+  { bg: '#FFE7CC', fg: '#E47B27' },
+  { bg: '#ECDFF4', fg: '#8B4FB8' },
+  { bg: '#D6F1F4', fg: '#1F8B95' },
+  { bg: '#FBDDEB', fg: '#D04D88' },
+  { bg: '#E9F4D2', fg: '#7AAD3C' },
+  { bg: '#E4DBF0', fg: '#6B4FAE' },
+  { bg: '#FFF4C9', fg: '#B58E20' },
 ];
+const LAST_EMAIL_KEY = 'jarch-last-email';
 
-let state = loadState();
+let state = { categories: [], terms: [] };
+let session = null;
 let filter = { category: 'ALL', query: '' };
 let selection = new Set();
 let editingId = null;
-let pendingPhoto = null;   // data URL waiting to be saved with the term
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { categories: [...DEFAULT_CATEGORIES], terms: [] };
-    const parsed = JSON.parse(raw);
-    if (!parsed.categories) parsed.categories = [...DEFAULT_CATEGORIES];
-    if (!parsed.terms) parsed.terms = [];
-    return parsed;
-  } catch (e) {
-    return { categories: [...DEFAULT_CATEGORIES], terms: [] };
-  }
-}
-
-function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    alert('저장 공간이 부족합니다. 일부 용어를 삭제하거나 사진 크기를 줄여 보세요.\n\n' + e.message);
-  }
-}
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
-
-function catColor(name) {
-  const idx = state.categories.indexOf(name);
-  if (idx < 0) return { bg: '#EEE', fg: '#555' };
-  return CAT_PALETTE[idx % CAT_PALETTE.length];
-}
+let pendingPhoto = null;
+let rtChannel = null;
 
 /* ---------------- Toast ---------------- */
 let toastTimer;
@@ -485,6 +569,125 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function catColor(name) {
+  const idx = state.categories.indexOf(name);
+  if (idx < 0) return { bg: '#EEE', fg: '#555' };
+  return CAT_PALETTE[idx % CAT_PALETTE.length];
+}
+
+/* ---------------- Auth ---------------- */
+async function initAuth() {
+  const { data: { session: s } } = await sb.auth.getSession();
+  await applySession(s);
+  sb.auth.onAuthStateChange(async (_event, s2) => { await applySession(s2); });
+}
+
+async function applySession(s) {
+  const splash = document.getElementById('splash');
+  const loginView = document.getElementById('login-view');
+  const appView = document.getElementById('app-view');
+
+  session = s;
+  if (s) {
+    // logged in
+    loginView.classList.remove('open');
+    appView.classList.remove('hidden');
+    splash.classList.add('hidden');
+    document.getElementById('account-email').textContent = s.user.email || '';
+    // Strip auth tokens from URL hash if present
+    if (window.location.hash.includes('access_token') || window.location.search.includes('code=')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    await hydrate();
+    subscribeRealtime();
+  } else {
+    // logged out
+    appView.classList.add('hidden');
+    splash.classList.add('hidden');
+    loginView.classList.add('open');
+    unsubscribeRealtime();
+    // Prefill last used email
+    const last = localStorage.getItem(LAST_EMAIL_KEY);
+    if (last) document.getElementById('login-email').value = last;
+  }
+}
+
+async function sendMagicLink() {
+  const emailEl = document.getElementById('login-email');
+  const msgEl = document.getElementById('login-msg');
+  const btn = document.getElementById('btn-magiclink');
+  const email = emailEl.value.trim();
+  msgEl.className = 'msg';
+  msgEl.textContent = '';
+
+  if (!email || !email.includes('@')) {
+    msgEl.classList.add('error');
+    msgEl.textContent = '올바른 이메일을 입력해주세요';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '전송 중…';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+  btn.disabled = false;
+  btn.textContent = '로그인 링크 받기';
+
+  if (error) {
+    msgEl.classList.add('error');
+    msgEl.textContent = '전송 실패: ' + error.message;
+    return;
+  }
+  localStorage.setItem(LAST_EMAIL_KEY, email);
+  msgEl.classList.add('success');
+  msgEl.textContent = `${email} 로 로그인 링크를 보냈어요.\n메일함을 확인하고 링크를 클릭하면 자동 로그인됩니다.`;
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+}
+
+/* ---------------- Data: hydrate + realtime ---------------- */
+async function hydrate() {
+  const [catsRes, termsRes] = await Promise.all([
+    sb.from('categories').select('id, name, created_at').order('created_at'),
+    sb.from('terms').select('id, ko, en, category, meaning, photo, created_at, updated_at'),
+  ]);
+  if (catsRes.error)  { toast('카테고리 로드 실패: ' + catsRes.error.message);  return; }
+  if (termsRes.error) { toast('용어 로드 실패: ' + termsRes.error.message);     return; }
+
+  state.categories = (catsRes.data || []).map(c => c.name);
+  state.terms = (termsRes.data || []).map(t => ({
+    id: t.id,
+    ko: t.ko || '',
+    en: t.en || '',
+    category: t.category || FALLBACK_CATEGORY,
+    meaning: t.meaning || '',
+    photo: t.photo || '',
+    createdAt: t.created_at,
+    updatedAt: t.updated_at,
+  }));
+  renderAll();
+}
+
+function subscribeRealtime() {
+  if (rtChannel) return;
+  rtChannel = sb.channel('jarch-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'terms' },      () => hydrate())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => hydrate())
+    .subscribe();
+}
+function unsubscribeRealtime() {
+  if (rtChannel) { sb.removeChannel(rtChannel); rtChannel = null; }
 }
 
 /* ---------------- Chips ---------------- */
@@ -518,14 +721,13 @@ function renderChips() {
     c.appendChild(text);
     c.onclick = () => { filter.category = cat; renderAll(); };
 
-    if (!DEFAULT_CATEGORIES.includes(cat)) {
-      const x = document.createElement('span');
-      x.className = 'x';
-      x.textContent = '✕';
-      x.title = '카테고리 삭제';
-      x.onclick = (e) => { e.stopPropagation(); deleteCategory(cat); };
-      c.appendChild(x);
-    }
+    // 모든 카테고리에 삭제 X를 노출 (Supabase 환경에선 기본 4개도 사용자 데이터)
+    const x = document.createElement('span');
+    x.className = 'x';
+    x.textContent = '✕';
+    x.title = '카테고리 삭제';
+    x.onclick = (e) => { e.stopPropagation(); deleteCategory(cat); };
+    c.appendChild(x);
     row.appendChild(c);
   });
 }
@@ -555,7 +757,7 @@ function renderTerms() {
     const empty = document.createElement('div');
     empty.className = 'empty';
     empty.innerHTML = state.terms.length === 0
-      ? `<h3>아직 정리한 용어가 없어요</h3><p>오른쪽 위 <strong>＋ 새 용어</strong>로 첫 용어를 담아보세요.</p>`
+      ? `<h3>아직 정리한 용어가 없어요</h3><p>오른쪽 위 <strong>＋ 새 용어</strong>로 첫 용어를 담아보세요.<br>이전에 백업해둔 JSON이 있다면 <strong>⬆ 가져오기</strong>로 복원할 수도 있어요.</p>`
       : `<h3>조건에 맞는 용어가 없어요</h3><p>다른 검색어나 카테고리를 시도해 보세요.</p>`;
     container.appendChild(empty);
     return;
@@ -660,7 +862,7 @@ function openTermModal(id = null) {
     document.getElementById('f-ko').value = '';
     document.getElementById('f-en').value = '';
     document.getElementById('f-meaning').value = '';
-    sel.value = filter.category !== 'ALL' ? filter.category : state.categories[0];
+    sel.value = filter.category !== 'ALL' ? filter.category : (state.categories[0] || '');
   }
 
   document.getElementById('f-photo').value = '';
@@ -674,43 +876,48 @@ function closeTermModal() {
   pendingPhoto = null;
 }
 
-function saveTerm() {
+async function saveTerm() {
   const ko = document.getElementById('f-ko').value.trim();
   const en = document.getElementById('f-en').value.trim();
   const meaning = document.getElementById('f-meaning').value.trim();
   const category = document.getElementById('f-cat').value;
 
-  if (!ko && !en) return toast('한글명 또는 영문명 중 하나는 입력해주세요');
-  if (!category)   return toast('카테고리를 선택해주세요');
+  if (!ko && !en)    return toast('한글명 또는 영문명 중 하나는 입력해주세요');
+  if (!category)     return toast('카테고리를 선택해주세요');
   if (!pendingPhoto) return toast('사진을 첨부해야 저장할 수 있어요');
 
-  const now = new Date().toISOString();
-  if (editingId) {
-    const t = state.terms.find(x => x.id === editingId);
-    Object.assign(t, { ko, en, meaning, category, photo: pendingPhoto, updatedAt: now });
-    toast('수정되었습니다');
-  } else {
-    state.terms.push({
-      id: uid(), ko, en, meaning, category,
-      photo: pendingPhoto, createdAt: now, updatedAt: now
-    });
-    toast('새 용어가 추가되었습니다');
-    maybeRecommendBackup();
+  const btn = document.getElementById('m-save');
+  btn.disabled = true;
+  try {
+    let res;
+    if (editingId) {
+      res = await sb.from('terms')
+        .update({ ko, en, meaning, category, photo: pendingPhoto })
+        .eq('id', editingId);
+    } else {
+      res = await sb.from('terms')
+        .insert({ ko, en, meaning, category, photo: pendingPhoto });
+    }
+    if (res.error) throw res.error;
+    toast(editingId ? '수정되었습니다' : '새 용어가 추가되었습니다');
+    closeTermModal();
+    await hydrate();
+  } catch (e) {
+    toast('저장 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
   }
-  saveState();
-  closeTermModal();
-  renderAll();
 }
 
-function deleteTerm(id) {
+async function deleteTerm(id) {
   const t = state.terms.find(x => x.id === id);
   if (!t) return;
   if (!confirm(`"${t.ko || t.en}" 용어를 삭제할까요?`)) return;
-  state.terms = state.terms.filter(x => x.id !== id);
+  const { error } = await sb.from('terms').delete().eq('id', id);
+  if (error) return toast('삭제 실패: ' + error.message);
   selection.delete(id);
-  saveState();
-  renderAll();
   toast('삭제되었습니다');
+  await hydrate();
 }
 
 /* ---------------- Photo handling ---------------- */
@@ -764,27 +971,40 @@ function openCatModal() {
   setTimeout(() => document.getElementById('f-cat-name').focus(), 30);
 }
 function closeCatModal() { document.getElementById('modal-cat').classList.remove('open'); }
-function saveCategory() {
+
+async function saveCategory() {
   const name = document.getElementById('f-cat-name').value.trim();
   if (!name) return toast('카테고리 이름을 입력해주세요');
   if (state.categories.includes(name)) return toast('이미 있는 카테고리예요');
-  state.categories.push(name);
-  saveState();
+  const { error } = await sb.from('categories').insert({ name });
+  if (error) return toast('카테고리 추가 실패: ' + error.message);
   closeCatModal();
-  renderAll();
   toast(`'${name}' 카테고리가 추가되었습니다`);
+  await hydrate();
 }
-function deleteCategory(name) {
+
+async function deleteCategory(name) {
   const used = state.terms.filter(t => t.category === name).length;
   let msg = `'${name}' 카테고리를 삭제할까요?`;
-  if (used > 0) msg += `\n이 카테고리에 속한 ${used}개 용어는 '일반 용어'로 이동됩니다.`;
+  if (used > 0) msg += `\n이 카테고리에 속한 ${used}개 용어는 '${FALLBACK_CATEGORY}'로 이동됩니다.`;
   if (!confirm(msg)) return;
-  state.terms.forEach(t => { if (t.category === name) t.category = '일반 용어'; });
-  state.categories = state.categories.filter(c => c !== name);
+
+  if (used > 0) {
+    // Ensure fallback category exists for this user
+    if (!state.categories.includes(FALLBACK_CATEGORY)) {
+      const insRes = await sb.from('categories').insert({ name: FALLBACK_CATEGORY });
+      if (insRes.error && !/duplicate|unique/i.test(insRes.error.message)) {
+        return toast('이동 실패: ' + insRes.error.message);
+      }
+    }
+    const updRes = await sb.from('terms').update({ category: FALLBACK_CATEGORY }).eq('category', name);
+    if (updRes.error) return toast('이동 실패: ' + updRes.error.message);
+  }
+  const delRes = await sb.from('categories').delete().eq('name', name);
+  if (delRes.error) return toast('삭제 실패: ' + delRes.error.message);
   if (filter.category === name) filter.category = 'ALL';
-  saveState();
-  renderAll();
   toast('카테고리가 삭제되었습니다');
+  await hydrate();
 }
 
 /* ---------------- Print ---------------- */
@@ -826,12 +1046,7 @@ function exportExcel() {
   }
 
   const COL_WIDTHS = [
-    { wch: 5 },   // 번호
-    { wch: 24 },  // 한글명
-    { wch: 32 },  // 영문명
-    { wch: 14 },  // 카테고리
-    { wch: 60 },  // 의미
-    { wch: 12 },  // 등록일
+    { wch: 5 }, { wch: 24 }, { wch: 32 }, { wch: 14 }, { wch: 60 }, { wch: 12 },
   ];
 
   const makeRow = (t, i) => ({
@@ -844,8 +1059,6 @@ function exportExcel() {
   });
 
   const wb = XLSX.utils.book_new();
-
-  // 전체 시트
   const allRows = state.terms.slice()
     .sort((a, b) => (a.ko || '').localeCompare(b.ko || '', 'ko'))
     .map(makeRow);
@@ -853,7 +1066,6 @@ function exportExcel() {
   wsAll['!cols'] = COL_WIDTHS;
   XLSX.utils.book_append_sheet(wb, wsAll, '전체');
 
-  // 카테고리별 시트
   state.categories.forEach(cat => {
     const rows = state.terms
       .filter(t => t.category === cat)
@@ -873,7 +1085,14 @@ function exportExcel() {
 
 /* ---------------- Import / Export ---------------- */
 function exportJSON() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const payload = {
+    categories: state.categories.slice(),
+    terms: state.terms.map(t => ({
+      id: t.id, ko: t.ko, en: t.en, category: t.category, meaning: t.meaning,
+      photo: t.photo, createdAt: t.createdAt, updatedAt: t.updatedAt,
+    })),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const stamp = new Date().toISOString().slice(0, 10);
@@ -882,51 +1101,77 @@ function exportJSON() {
   toast('백업 파일이 저장되었습니다');
 }
 
-function importJSON(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data.terms) || !Array.isArray(data.categories)) {
-        throw new Error('형식이 올바르지 않습니다');
-      }
-      const choice = confirm('가져온 데이터로 현재 데이터를 \'대체\'할까요?\n\n[확인] = 전체 대체\n[취소] = 병합 (기존 데이터 유지하며 추가)');
-      if (choice) {
-        state = data;
-      } else {
-        const existing = new Set(state.terms.map(t => (t.ko || '') + '||' + (t.en || '')));
-        data.terms.forEach(t => {
-          const key = (t.ko || '') + '||' + (t.en || '');
-          if (!existing.has(key)) {
-            if (!t.id) t.id = uid();
-            state.terms.push(t);
-          }
-        });
-        data.categories.forEach(c => { if (!state.categories.includes(c)) state.categories.push(c); });
-      }
-      saveState();
-      renderAll();
-      toast('데이터를 가져왔습니다');
-    } catch (err) {
-      alert('파일을 읽을 수 없습니다: ' + err.message);
+async function importJSON(file) {
+  let data;
+  try {
+    const text = await file.text();
+    data = JSON.parse(text);
+    if (!Array.isArray(data.terms) || !Array.isArray(data.categories)) {
+      throw new Error('형식이 올바르지 않습니다 (terms, categories 배열이 필요)');
     }
-  };
-  reader.readAsText(file);
-}
-
-/* ---------------- Misc ---------------- */
-function maybeRecommendBackup() {
-  const lastNudge = parseInt(localStorage.getItem('jins-archive-lastNudge') || '0', 10);
-  if (state.terms.length > 0 && state.terms.length % 20 === 0 && Date.now() - lastNudge > 1000 * 60 * 60 * 24) {
-    localStorage.setItem('jins-archive-lastNudge', Date.now().toString());
-    setTimeout(() => toast('💡 20개마다 한 번씩 \'내보내기\'로 백업해두세요'), 2000);
+  } catch (err) {
+    return alert('파일을 읽을 수 없습니다: ' + err.message);
   }
-}
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
+  const replace = confirm(
+    '가져온 데이터로 현재 데이터를 \'대체\'할까요?\n\n' +
+    '[확인] = 전체 대체 (현재 클라우드 데이터를 모두 삭제하고 가져온 것으로 교체)\n' +
+    '[취소] = 병합 (기존 유지, 가져온 항목 중 새로운 것만 추가)'
+  );
+
+  toast('가져오는 중…');
+
+  try {
+    if (replace) {
+      // Delete all existing rows for this user (RLS limits to own rows)
+      const delTerms = await sb.from('terms').delete().not('id', 'is', null);
+      if (delTerms.error) throw delTerms.error;
+      const delCats = await sb.from('categories').delete().not('id', 'is', null);
+      if (delCats.error) throw delCats.error;
+    }
+
+    // 1) Categories — insert all unique ones, ignore duplicates
+    const existingCats = replace ? [] : state.categories.slice();
+    const catsToAdd = data.categories.filter(c => c && !existingCats.includes(c));
+    if (catsToAdd.length) {
+      const { error } = await sb.from('categories').insert(catsToAdd.map(name => ({ name })));
+      // ignore unique-violation errors
+      if (error && !/duplicate|unique/i.test(error.message)) throw error;
+    }
+
+    // 2) Terms — drop old IDs, batch insert (10 at a time to keep payload small)
+    const existingKeys = replace ? new Set() :
+      new Set(state.terms.map(t => `${t.ko || ''}||${t.en || ''}`));
+    const toInsert = data.terms
+      .filter(t => {
+        const key = `${t.ko || ''}||${t.en || ''}`;
+        if (existingKeys.has(key)) return false;
+        existingKeys.add(key);
+        return true;
+      })
+      .map(t => ({
+        ko: t.ko || '',
+        en: t.en || '',
+        category: t.category || FALLBACK_CATEGORY,
+        meaning: t.meaning || '',
+        photo: t.photo || null,
+      }));
+
+    const BATCH = 10;
+    let done = 0;
+    for (let i = 0; i < toInsert.length; i += BATCH) {
+      const slice = toInsert.slice(i, i + BATCH);
+      const { error } = await sb.from('terms').insert(slice);
+      if (error) throw error;
+      done += slice.length;
+      if (toInsert.length > BATCH) toast(`가져오는 중… ${done}/${toInsert.length}`);
+    }
+
+    toast(`${toInsert.length}개 용어를 가져왔습니다`);
+    await hydrate();
+  } catch (err) {
+    alert('가져오기 실패: ' + (err.message || err));
+  }
 }
 
 /* ---------------- Wire up ---------------- */
@@ -947,6 +1192,12 @@ document.getElementById('file-import').onchange = (e) => {
   if (e.target.files[0]) importJSON(e.target.files[0]);
   e.target.value = '';
 };
+
+document.getElementById('btn-signout').onclick = signOut;
+document.getElementById('btn-magiclink').onclick = sendMagicLink;
+document.getElementById('login-email').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendMagicLink();
+});
 
 // search: live filter + clickable magnifier focuses input
 document.getElementById('search-input').addEventListener('input', (e) => {
@@ -978,7 +1229,8 @@ document.addEventListener('keydown', (e) => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
-    document.getElementById('search-input').focus();
+    const si = document.getElementById('search-input');
+    if (si && !document.getElementById('app-view').classList.contains('hidden')) si.focus();
   }
 });
 
@@ -986,7 +1238,7 @@ document.getElementById('f-cat-name').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') saveCategory();
 });
 
-renderAll();
+initAuth();
 </script>
 </body>
 </html>
